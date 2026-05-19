@@ -113,7 +113,7 @@ router.get('/', async (req, res) => {
       `SELECT
          i.id, i.title, i.description, i.status, i.priority,
          i.user_id, i.created_at, i.updated_at,
-         u.email AS created_by
+         u.full_name AS created_by
        FROM issues i
        JOIN users u ON u.id = i.user_id
        ${where}
@@ -154,7 +154,7 @@ router.get('/:id', async (req, res) => {
       `SELECT
          i.id, i.title, i.description, i.status, i.priority,
          i.user_id, i.created_at, i.updated_at,
-         u.email AS created_by
+         u.full_name AS created_by
        FROM issues i
        JOIN users u ON u.id = i.user_id
        WHERE i.id = ?`,
@@ -209,7 +209,7 @@ router.post('/', async (req, res) => {
 
     const [newIssue] = await pool.query(
       `SELECT i.id, i.title, i.description, i.status, i.priority,
-              i.user_id, i.created_at, i.updated_at, u.email AS created_by
+              i.user_id, i.created_at, i.updated_at, u.full_name AS created_by
        FROM issues i JOIN users u ON u.id = i.user_id
        WHERE i.id = ?`,
       [result.insertId]
@@ -287,7 +287,7 @@ router.put('/:id', async (req, res) => {
 
     const [updated] = await pool.query(
       `SELECT i.id, i.title, i.description, i.status, i.priority,
-              i.user_id, i.created_at, i.updated_at, u.email AS created_by
+              i.user_id, i.created_at, i.updated_at, u.full_name AS created_by
        FROM issues i JOIN users u ON u.id = i.user_id
        WHERE i.id = ?`,
       [id]

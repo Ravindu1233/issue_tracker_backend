@@ -128,6 +128,7 @@ Register a new user.
 **Request body:**
 ```json
 {
+  "full_name": "Example User",
   "email": "user@example.com",
   "password": "secret123"
 }
@@ -138,7 +139,7 @@ Register a new user.
 {
   "message": "Account created successfully.",
   "token": "<jwt>",
-  "user": { "id": 1, "email": "user@example.com" }
+  "user": { "id": 1, "full_name": "Example User", "email": "user@example.com" }
 }
 ```
 
@@ -161,7 +162,7 @@ Log in an existing user.
 {
   "message": "Logged in successfully.",
   "token": "<jwt>",
-  "user": { "id": 1, "email": "user@example.com" }
+  "user": { "id": 1, "full_name": "Example User", "email": "user@example.com" }
 }
 ```
 
@@ -330,6 +331,7 @@ Delete an issue by ID.
 
 | Field      | Rule                                                  |
 |------------|-------------------------------------------------------|
+| `full_name` | Required, max 255 characters                        |
 | `email`    | Required, valid email format                          |
 | `password` | Required, minimum 6 characters                        |
 | `title`    | Required, max 255 characters                          |

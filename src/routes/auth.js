@@ -53,10 +53,16 @@ const validateResetOtp = async (email, otp) => {
 // ─────────────────────────────────────────────
 router.post('/register', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { full_name, email, password } = req.body;
 
     // ── Validation ──────────────────────────
     const errors = [];
+
+    if (!full_name || typeof full_name !== 'string' || !full_name.trim()) {
+      errors.push('Full name is required.');
+    } else if (full_name.trim().length > 255) {
+      errors.push('Full name must be 255 characters or less.');
+    }
 
     if (!email || typeof email !== 'string' || !email.trim()) {
       errors.push('Email is required.');
@@ -74,6 +80,7 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'Validation failed.', errors });
     }
 
+    const trimmedFullName = full_name.trim();
     const normalizedEmail = email.trim().toLowerCase();
 
     // ── Check duplicate ──────────────────────
@@ -91,17 +98,17 @@ router.post('/register', async (req, res) => {
 
     // ── Insert user ──────────────────────────
     const [result] = await pool.query(
-      'INSERT INTO users (email, password) VALUES (?, ?)',
-      [normalizedEmail, hashedPassword]
+      'INSERT INTO users (full_name, email, password) VALUES (?, ?, ?)',
+      [trimmedFullName, normalizedEmail, hashedPassword]
     );
 
-    const newUser = { id: result.insertId, email: normalizedEmail };
+    const newUser = { id: result.insertId, full_name: trimmedFullName, email: normalizedEmail };
     const token   = generateToken(newUser);
 
     return res.status(201).json({
       message: 'Account created successfully.',
       token,
-      user: { id: newUser.id, email: newUser.email },
+      user: { id: newUser.id, full_name: newUser.full_name, email: newUser.email },
     });
   } catch (err) {
     console.error('[POST /auth/register]', err);
@@ -134,7 +141,7 @@ router.post('/login', async (req, res) => {
 
     // ── Find user ────────────────────────────
     const [rows] = await pool.query(
-      'SELECT id, email, password FROM users WHERE email = ?',
+      'SELECT id, full_name, email, password FROM users WHERE email = ?',
       [normalizedEmail]
     );
 
@@ -157,7 +164,7 @@ router.post('/login', async (req, res) => {
     return res.status(200).json({
       message: 'Logged in successfully.',
       token,
-      user: { id: user.id, email: user.email },
+      user: { id: user.id, full_name: user.full_name, email: user.email },
     });
   } catch (err) {
     console.error('[POST /auth/login]', err);
