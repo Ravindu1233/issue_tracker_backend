@@ -1,5 +1,6 @@
 const express = require('express');
 const pool    = require('../db/connection');
+const { sendIssueStatusEmail } = require('../services/mailer');
 
 const router = express.Router();
 
@@ -10,6 +11,65 @@ const router = express.Router();
 const VALID_STATUSES   = ['Open', 'In Progress', 'Resolved', 'Closed'];
 const VALID_PRIORITIES = ['Low', 'Medium', 'High'];
 const VALID_SORT_COLS  = ['created_at', 'updated_at', 'title', 'status', 'priority'];
+const NOTIFIABLE_STATUSES = ['In Progress', 'Resolved', 'Closed'];
+
+const notifyIssueCreatorOnStatusChange = async (issue, status, updaterId) => {
+  if (!status || issue.status === status || Number(issue.user_id) === Number(updaterId)) {
+    return;
+  }
+
+  if (!NOTIFIABLE_STATUSES.includes(status)) {
+    return;
+  }
+
+  const [rows] = await pool.query(
+    `SELECT
+       u.id, u.full_name, u.email,
+       COALESCE(us.show_notifications, 0) AS show_notifications,
+       COALESCE(us.email_notifications, 0) AS email_notifications
+     FROM users u
+     LEFT JOIN user_settings us ON us.user_id = u.id
+     WHERE u.id = ?`,
+    [issue.user_id]
+  );
+
+  if (rows.length === 0) {
+    return;
+  }
+
+  const creator = rows[0];
+  const [updaterRows] = await pool.query(
+    'SELECT full_name, email FROM users WHERE id = ?',
+    [updaterId]
+  );
+  const updatedBy = updaterRows[0] || {};
+  const updaterName = updatedBy.full_name || updatedBy.email || 'Another user';
+  const title = `${updaterName} updated an issue`;
+  const message = `${updaterName} changed "${issue.title}" from ${issue.status} to ${status}.`;
+
+  if (Number(creator.show_notifications) === 1) {
+    await pool.query(
+      'INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, ?)',
+      [issue.user_id, title, message, 'issue_status']
+    );
+  }
+
+  if (Number(creator.email_notifications) === 1) {
+    try {
+      await sendIssueStatusEmail(
+        creator.email,
+        {
+          title: issue.title,
+          previous_status: issue.status,
+          status,
+        },
+        updatedBy
+      );
+    } catch (err) {
+      console.error('[Issue status email failed]', err.message);
+    }
+  }
+};
 
 // ─────────────────────────────────────────────
 // GET /api/issues/stats  ← must come BEFORE /:id
@@ -237,7 +297,7 @@ router.put('/:id', async (req, res) => {
     }
 
     // ── Check issue exists ───────────────────
-    const [existing] = await pool.query('SELECT id, user_id FROM issues WHERE id = ?', [id]);
+    const [existing] = await pool.query('SELECT id, title, status, user_id FROM issues WHERE id = ?', [id]);
 
     if (existing.length === 0) {
       return res.status(404).json({ message: `Issue with ID ${id} not found.` });
@@ -284,6 +344,7 @@ router.put('/:id', async (req, res) => {
     values.push(id);
 
     await pool.query(`UPDATE issues SET ${fields.join(', ')} WHERE id = ?`, values);
+    await notifyIssueCreatorOnStatusChange(existing[0], status, req.user.id);
 
     const [updated] = await pool.query(
       `SELECT i.id, i.title, i.description, i.status, i.priority,

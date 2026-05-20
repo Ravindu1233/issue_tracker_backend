@@ -30,7 +30,9 @@ issue-tracker-backend/
 │   │   └── authMiddleware.js   # JWT verification middleware
 │   └── routes/
 │       ├── auth.js             # POST /register, POST /login
-│       └── issues.js           # Full CRUD + stats + search/filter/pagination
+│       ├── issues.js           # Full CRUD + stats + search/filter/pagination
+│       ├── settings.js         # User dark mode and notification preferences
+│       └── notifications.js    # User notifications
 ├── db.sql                      # Database schema — run once to set up tables
 ├── .env.example                # Sample environment variables
 ├── package.json
@@ -87,12 +89,18 @@ mysql -u root -p < db.sql
 
 Or paste its contents into MySQL Workbench / DBeaver / phpMyAdmin.
 
-The schema uses only `users` and `issues`. Issue `status` and `priority` are stored directly on `issues` as MySQL `ENUM` columns, so separate status/priority tables are not required.
+The schema uses `users`, `issues`, `user_settings`, and `notifications`. Issue `status` and `priority` are stored directly on `issues` as MySQL `ENUM` columns, so separate status/priority tables are not required.
 
 If you already created an older database with separate status/priority lookup tables, run:
 
 ```bash
 mysql -u root -p issue_tracker < migrations/001_inline_issue_enums.sql
+```
+
+If your database already exists and only needs the settings and notifications tables, run:
+
+```bash
+mysql -u root -p issue_tracker < migrations/004_add_user_settings_and_notifications.sql
 ```
 
 ### 5. Start the Server
@@ -299,6 +307,11 @@ Update an existing issue (partial updates supported).
 }
 ```
 
+If another user changes the issue creator's issue status to `In Progress`, `Resolved`, or `Closed`, the creator is notified based on their settings:
+
+- `show_notifications: true` creates an in-app notification.
+- `email_notifications: true` sends an email notification.
+
 ---
 
 #### `DELETE /api/issues/:id`
@@ -311,6 +324,69 @@ Delete an issue by ID.
   "message": "Issue 5 deleted successfully."
 }
 ```
+
+---
+
+### Settings - `/api/settings` *(JWT required)*
+
+#### `GET /api/settings`
+
+Returns the logged-in user's settings. Missing settings rows are created with all values set to `false`.
+
+**Success `200`:**
+```json
+{
+  "settings": {
+    "id": 1,
+    "user_id": 1,
+    "dark_mode": false,
+    "show_notifications": false,
+    "email_notifications": false,
+    "created_at": "2026-05-20T00:00:00.000Z",
+    "updated_at": "2026-05-20T00:00:00.000Z"
+  }
+}
+```
+
+#### `PUT /api/settings`
+
+Update one or more settings. Values must be boolean-compatible (`true`, `false`, `1`, `0`, `"true"`, `"false"`).
+
+**Request body:**
+```json
+{
+  "dark_mode": true,
+  "show_notifications": true,
+  "email_notifications": false
+}
+```
+
+When a setting value changes, a notification row is created for that user.
+Issue status notifications are also controlled here: turn on `show_notifications` for app notifications and `email_notifications` for email notifications.
+
+---
+
+### Notifications - `/api/notifications` *(JWT required)*
+
+#### `GET /api/notifications`
+
+Supports pagination and unread filtering.
+
+```http
+GET /api/notifications?page=1&limit=20&unreadOnly=true
+```
+
+#### `PATCH /api/notifications/:id/read`
+
+Marks one notification as read.
+
+#### `PATCH /api/notifications/read-all`
+
+Marks all unread notifications for the logged-in user as read.
+
+#### `DELETE /api/notifications/:id`
+
+Deletes one notification owned by the logged-in user.
 
 ---
 
@@ -337,6 +413,9 @@ Delete an issue by ID.
 | `title`    | Required, max 255 characters                          |
 | `status`   | Must be one of: `Open`, `In Progress`, `Resolved`, `Closed` |
 | `priority` | Must be one of: `Low`, `Medium`, `High`               |
+| `dark_mode` | Must be true or false                                |
+| `show_notifications` | Must be true or false                       |
+| `email_notifications` | Must be true or false                      |
 
 ---
 

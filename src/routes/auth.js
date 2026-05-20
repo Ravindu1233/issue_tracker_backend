@@ -102,6 +102,8 @@ router.post('/register', async (req, res) => {
       [trimmedFullName, normalizedEmail, hashedPassword]
     );
 
+    await pool.query('INSERT INTO user_settings (user_id) VALUES (?)', [result.insertId]);
+
     const newUser = { id: result.insertId, full_name: trimmedFullName, email: normalizedEmail };
     const token   = generateToken(newUser);
 

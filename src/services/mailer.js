@@ -36,6 +36,35 @@ const sendResetOtpEmail = async (to, otp) => {
   });
 };
 
+const escapeHtml = (value) =>
+  String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const sendIssueStatusEmail = async (to, issue, updatedBy) => {
+  const fromAddress = process.env.MAIL_FROM_ADDRESS || process.env.MAIL_USERNAME;
+  const fromName = process.env.MAIL_FROM_NAME || 'Issue Tracker';
+  const updaterName = updatedBy.full_name || updatedBy.email || 'Another user';
+  const subject = `${updaterName} updated issue status: ${issue.title}`;
+
+  await getMailTransport().sendMail({
+    from: `"${fromName}" <${fromAddress}>`,
+    to,
+    subject,
+    text: `${updaterName} changed your issue "${issue.title}" from ${issue.previous_status} to ${issue.status}.`,
+    html: `
+      <p>${escapeHtml(updaterName)} changed your issue status.</p>
+      <p><strong>Issue:</strong> ${escapeHtml(issue.title)}</p>
+      <p><strong>Previous status:</strong> ${escapeHtml(issue.previous_status)}</p>
+      <p><strong>New status:</strong> ${escapeHtml(issue.status)}</p>
+    `,
+  });
+};
+
 module.exports = {
   sendResetOtpEmail,
+  sendIssueStatusEmail,
 };
