@@ -7,6 +7,12 @@ const SETTING_FIELDS = ['dark_mode', 'show_notifications', 'email_notifications'
 
 const toBoolean = (value) => Boolean(Number(value));
 
+const createHttpError = (statusCode, message) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
 const formatSettings = (row) => ({
   id:                  row.id,
   user_id:             row.user_id,
@@ -18,6 +24,10 @@ const formatSettings = (row) => ({
 });
 
 const ensureSettings = async (userId) => {
+  if (!Number.isInteger(Number(userId))) {
+    throw createHttpError(401, 'Invalid authenticated user.');
+  }
+
   await pool.query('INSERT IGNORE INTO user_settings (user_id) VALUES (?)', [userId]);
 
   const [rows] = await pool.query(
@@ -27,7 +37,17 @@ const ensureSettings = async (userId) => {
     [userId]
   );
 
-  return rows[0];
+  if (rows[0]) {
+    return rows[0];
+  }
+
+  const [users] = await pool.query('SELECT id FROM users WHERE id = ?', [userId]);
+
+  if (users.length === 0) {
+    throw createHttpError(401, 'Authenticated user no longer exists. Please log in again.');
+  }
+
+  throw createHttpError(500, 'Unable to load user settings.');
 };
 
 const parseBoolean = (value) => {
@@ -44,7 +64,7 @@ router.get('/', async (req, res) => {
     return res.status(200).json({ settings: formatSettings(settings) });
   } catch (err) {
     console.error('[GET /settings]', err);
-    return res.status(500).json({ message: 'Internal server error.' });
+    return res.status(err.statusCode || 500).json({ message: err.statusCode ? err.message : 'Internal server error.' });
   }
 });
 
@@ -88,7 +108,7 @@ router.put('/', async (req, res) => {
     });
   } catch (err) {
     console.error('[PUT /settings]', err);
-    return res.status(500).json({ message: 'Internal server error.' });
+    return res.status(err.statusCode || 500).json({ message: err.statusCode ? err.message : 'Internal server error.' });
   }
 });
 
