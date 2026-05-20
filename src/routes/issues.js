@@ -249,6 +249,10 @@ router.post('/', async (req, res) => {
       errors.push('Title must be 255 characters or fewer.');
     }
 
+    if (typeof description !== 'string') {
+      errors.push('Description must be a string.');
+    }
+
     if (!VALID_STATUSES.includes(status)) {
       errors.push(`Status must be one of: ${VALID_STATUSES.join(', ')}.`);
     }
@@ -304,6 +308,16 @@ router.put('/:id', async (req, res) => {
     }
 
     const { title, description, status, priority } = req.body;
+    const isCreator = Number(existing[0].user_id) === Number(req.user.id);
+    const creatorOnlyFields = ['title', 'description', 'priority'].filter(
+      (field) => Object.prototype.hasOwnProperty.call(req.body, field)
+    );
+
+    if (!isCreator && creatorOnlyFields.length > 0) {
+      return res.status(403).json({
+        message: 'Only the issue creator can update title, description, or priority. Any signed-in user can update status.',
+      });
+    }
 
     // ── Validation ──────────────────────────
     const errors = [];
@@ -314,6 +328,10 @@ router.put('/:id', async (req, res) => {
       } else if (title.trim().length > 255) {
         errors.push('Title must be 255 characters or fewer.');
       }
+    }
+
+    if (description !== undefined && typeof description !== 'string') {
+      errors.push('Description must be a string.');
     }
 
     if (status !== undefined && !VALID_STATUSES.includes(status)) {
@@ -375,10 +393,14 @@ router.delete('/:id', async (req, res) => {
       return res.status(400).json({ message: 'Issue ID must be a positive integer.' });
     }
 
-    const [existing] = await pool.query('SELECT id FROM issues WHERE id = ?', [id]);
+    const [existing] = await pool.query('SELECT id, user_id FROM issues WHERE id = ?', [id]);
 
     if (existing.length === 0) {
       return res.status(404).json({ message: `Issue with ID ${id} not found.` });
+    }
+
+    if (Number(existing[0].user_id) !== Number(req.user.id)) {
+      return res.status(403).json({ message: 'Only the issue creator can delete this issue.' });
     }
 
     await pool.query('DELETE FROM issues WHERE id = ?', [id]);
