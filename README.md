@@ -77,7 +77,16 @@ DB_NAME=issue_tracker
 
 JWT_SECRET=replace_with_a_long_random_string
 JWT_EXPIRES_IN=7d
+
+GMAIL_USER=carmarketlanka@gmail.com
+GMAIL_CLIENT_ID=your_google_oauth_web_client_id
+GMAIL_CLIENT_SECRET=your_google_oauth_web_client_secret
+GMAIL_REFRESH_TOKEN=your_oauth_playground_refresh_token
+MAIL_FROM_ADDRESS=carmarketlanka@gmail.com
+MAIL_FROM_NAME=Issue Tracker
 ```
+
+For deployed email on Railway, this backend sends mail through the Gmail API over HTTPS. Create a Google OAuth **Web application** client, use `https://developers.google.com/oauthplayground` as the redirect URI, enable **Use your own OAuth credentials** in OAuth Playground, authorize the `https://mail.google.com/` scope with the Gmail account that will send email, then exchange the code and copy the refresh token into `GMAIL_REFRESH_TOKEN`.
 
 ### 4. Set Up the Database
 
