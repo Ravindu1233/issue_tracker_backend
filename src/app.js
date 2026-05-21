@@ -7,6 +7,7 @@ const issueRoutes    = require('./routes/issues');
 const settingsRoutes = require('./routes/settings');
 const notificationRoutes = require('./routes/notifications');
 const authMiddleware = require('./middleware/authMiddleware');
+const initializeDatabase = require('./db/initialize');
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
@@ -38,8 +39,20 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ message: 'An unexpected error occurred.' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
+async function startServer() {
+  try {
+    await initializeDatabase();
+    console.log('Database schema is ready');
+
+    app.listen(PORT, () => {
+      console.log(`Server running at http://localhost:${PORT}`);
+    });
+  } catch (err) {
+    console.error('Failed to initialize database schema:', err);
+    process.exit(1);
+  }
+}
+
+startServer();
 
 module.exports = app;
